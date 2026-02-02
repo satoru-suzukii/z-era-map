@@ -1,4 +1,4 @@
-# 🧟 Z-Day: Infinite Survival Map Engine
+# 🧟 Z-Era: Infinite Survival Map Engine
 
 **Made by Satoru Suzuki**
 
