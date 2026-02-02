@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Z-Day: Infinite Survival</title>
+<style>
+    :root {
+        /* --- THEME: BIOHAZARD APOCALYPSE --- */
+        --bg: #0d110d;
+        --panel: #141a14;
+        --border: #2a382a;
+        --text: #c2d6c2;
+        
+        /* Indicators */
+        --heat: #4ade80;       /* Safe/Functional */
+        --cold: #eab308;       /* Radiation/Warning */
+        --danger: #ef4444;     /* Horde/Infection */
+        --toxic: #a3e635;      /* Toxic Sludge */
+
+        /* --- BIOME PALETTE (Decay & Nature) --- */
+        --c-void: #000000;         /* The Abyss */
+        --c-water: #0f1c15;        /* Toxic Ocean */
+        --c-coast: #1c2920;        /* Mud Flats */
+        
+        --c-plains: #2d332d;       /* Cracked Concrete/Wasteland */
+        --c-forest: #143d22;       /* Deep Overgrowth */
+        --c-swamp: #252e18;        /* Fungal Swamp */
+        
+        --c-ruins: #404040;        /* Urban Rubble */
+        --c-city: #1e293b;         /* City Grid */
+        
+        --c-mtn: #4b5563;          /* Grey Mountains */
+        --c-peak: #cbd5e1;         /* High Summit */
+        --c-dead: #3f0808;         /* Dead Zone (High Infection) */
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
+
+    body {
+        margin: 0;
+        background-color: var(--bg);
+        color: var(--text);
+        font-family: 'Courier New', Courier, monospace; /* Gritty Terminal Font */
+        height: 100dvh; 
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    /* --- LAYOUT CONTAINER --- */
+    .game-container {
+        width: 100%;
+        max-width: 600px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        border-left: 1px solid var(--border);
+        border-right: 1px solid var(--border);
+        background: var(--panel);
+        position: relative;
+    }
+
+    /* --- HEADER --- */
+    .header {
+        padding: 15px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        background: #050505;
+        flex-shrink: 0;
+        z-index: 10;
+        box-shadow: 0 2px 15px rgba(0,0,0,0.8);
+    }
+    .coords-label { font-size: 0.6rem; color: #4b6b55; letter-spacing: 1px; font-weight: bold; margin-bottom: 2px; text-transform: uppercase; }
+    .coords-val { font-family: monospace; color: var(--heat); font-size: 1.2rem; font-weight: bold; text-shadow: 0 0 10px rgba(74, 222, 128, 0.3); }
+    
+    .status-box { text-align: right; }
+    .biome-name { color: var(--cold); font-weight: bold; font-size: 0.95rem; text-transform: uppercase;}
+    .temp-readout { font-size: 0.75rem; color: var(--danger); font-weight: bold; opacity: 0.9; }
+
+    /* --- MAP VIEWPORT --- */
+    .map-viewport {
+        flex-grow: 1;
+        min-height: 0;
+        background: #000;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(11, 1fr); 
+        grid-template-rows: repeat(11, 1fr);
+        width: 100%;
+        max-width: 500px; 
+        aspect-ratio: 1/1;
+        gap: 1px; 
+        background: #000;
+    }
+
+    /* --- TILES --- */
+    .tile {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: clamp(14px, 4.5vw, 24px);
+        cursor: pointer;
+        position: relative;
+        transition: transform 0.1s, filter 0.1s;
+        user-select: none;
+    }
+
+    .tile:hover {
+        filter: brightness(1.3) contrast(1.1);
+        z-index: 10;
+        transform: scale(1.15);
+        box-shadow: 0 0 15px rgba(74, 222, 128, 0.2);
+        border: 1px solid var(--heat);
+    }
+
+    .tile:active { transform: scale(0.95); }
+
+    .center-tile {
+        outline: 2px solid var(--heat);
+        outline-offset: -2px;
+        z-index: 5;
+        box-shadow: inset 0 0 15px rgba(74, 222, 128, 0.4);
+    }
+
+    /* Survivor Log Marker */
+    .tile.has-note::after {
+        content: ''; position: absolute; top: 4px; right: 4px;
+        width: 6px; height: 6px; background: var(--cold);
+        border-radius: 50%; box-shadow: 0 0 4px var(--cold);
+    }
+
+    /* --- CONTROLS --- */
+    .controls {
+        padding: 15px;
+        padding-bottom: max(15px, env(safe-area-inset-bottom));
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 15px;
+        background: var(--panel);
+        border-top: 1px solid var(--border);
+        flex-shrink: 0;
+        z-index: 20;
+    }
+
+    .d-pad { display: grid; grid-template-columns: 60px 60px 60px; gap: 8px; }
+
+    button {
+        background: #1c2620; 
+        border: 1px solid var(--border); 
+        color: var(--text);
+        padding: 12px; 
+        border-radius: 2px; 
+        cursor: pointer; 
+        font-size: 18px;
+        font-family: 'Courier New', monospace;
+        touch-action: manipulation; 
+        transition: all 0.1s;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+    }
+    
+    button:active { 
+        background: var(--heat); 
+        color: #000; 
+        transform: translateY(2px);
+    }
+
+    .settings-btn {
+        width: 100%;
+        max-width: 200px;
+        font-size: 0.8rem;
+        font-weight: bold;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: #151f18;
+        border: 1px solid #2a382a;
+    }
+    
+    .footer-info {
+        font-size: 10px; color: #4b6b55; font-family: monospace; text-align: center;
+    }
+
+    /* --- MODALS --- */
+    .modal {
+        position: absolute; bottom: 0; left: 0; right: 0; 
+        background: #141a14; border-top: 2px solid var(--heat); padding: 20px;
+        transform: translateY(110%); 
+        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        display: flex; flex-direction: column; z-index: 100; 
+        box-shadow: 0 -20px 50px rgba(0,0,0,0.9);
+        max-height: 80%;
+    }
+    .modal.active { transform: translateY(0); }
+
+    /* Notebook Specifics */
+    #notebook-modal { height: 50%; }
+    .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; flex-shrink: 0; }
+    .note-title { font-weight: bold; color: var(--heat); font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px; }
+    .note-desc { font-style: italic; color: #6b8c75; font-size: 0.85em; margin-top: 4px; }
+    
+    textarea {
+        width: 100%; flex-grow: 1; background: #0a0e0a; border: 1px solid var(--border);
+        color: var(--heat); padding: 15px; resize: none; margin-bottom: 15px;
+        font-family: monospace; outline: none; border-radius: 2px;
+    }
+    textarea:focus { border-color: var(--heat); }
+    
+    .primary-btn { background: var(--heat); color: #000; font-weight: bold; border: none; padding: 15px; border-radius: 2px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; width: 100%; }
+    .close-btn { background: none; border: 1px solid #4b6b55; font-size: 10px; padding: 4px 10px; color: #4b6b55; border-radius: 2px; cursor: pointer; }
+
+    /* Settings Specifics */
+    #settings-modal { height: auto; padding-bottom: 20px; }
+    .settings-section { margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
+    .settings-label { font-size: 0.75rem; color: #4b6b55; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: bold;}
+    
+    .seed-row { display: flex; gap: 10px; margin-bottom: 10px; }
+    #custom-seed-input {
+        flex: 1; background: #0a0e0a; border: 1px solid var(--border); color: var(--heat); 
+        font-family: monospace; padding: 10px; font-size: 1.1rem; border-radius: 2px;
+    }
+    
+    .action-row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;}
+    .btn-sm { 
+        font-size: 11px; padding: 12px 5px; text-transform: uppercase; font-weight: bold; 
+        letter-spacing: 0.5px; flex: 1; background: #1c2620; color: #c2d6c2;
+        min-width: 120px;
+        border-radius: 2px;
+    }
+    .btn-red { border-bottom: 2px solid var(--danger); }
+    .btn-green { border-bottom: 2px solid var(--heat); color: #fff;}
+    .btn-gold { border-bottom: 2px solid var(--cold); color: #fff; }
+
+    .credits { margin-top: 10px; font-size: 10px; color: #4b6b55; text-align: center; font-family: monospace; }
+
+    /* Log List Specifics */
+    #logs-modal { height: 60%; }
+    .log-list { overflow-y: auto; flex-grow: 1; border: 1px solid var(--border); background: #000; border-radius: 2px; }
+    .log-item { padding: 12px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    .log-item:last-child { border-bottom: none; }
+    .log-coords { font-family: monospace; color: var(--heat); font-weight: bold; font-size: 0.8rem; display: block; margin-bottom: 4px; }
+    .log-text { color: #ccc; font-style: italic; white-space: pre-wrap; }
+    .empty-logs { padding: 20px; text-align: center; color: #4b6b55; font-style: italic; }
+
+</style>
+</head>
+<body>
+
+<div class="game-container">
+    <div class="header">
+        <div>
+            <div class="coords-label">SCAVENGER GPS</div>
+            <div class="coords-val" id="coords-display">0, 0</div>
+        </div>
+        <div class="status-box">
+            <div class="biome-name" id="biome-display">SCANNING...</div>
+            <div class="temp-readout" id="temp-display">RAD: LOW</div>
+        </div>
+    </div>
+
+    <div class="map-viewport">
+        <div class="grid" id="grid"></div>
+    </div>
+
+    <div class="controls">
+        <div class="d-pad">
+            <div></div><button onclick="move(0, -1)">▲</button><div></div>
+            <button onclick="move(-1, 0)">◀</button>
+            <button onclick="zoom()" title="Scout Area" style="font-size: 20px;">🔦</button> 
+            <button onclick="move(1, 0)">▶</button>
+            <div></div><button onclick="move(0, 1)">▼</button><div></div>
+        </div>
+        
+        <button class="settings-btn" onclick="toggleSettings()">
+            <span>⚙️ System</span>
+        </button>
+
+        <div class="footer-info">
+            <span id="seed-display">Seed: 000000</span>
+        </div>
+    </div>
+</div>
+
+<div id="notebook-modal" class="modal">
+    <div class="modal-header">
+        <div>
+            <div class="note-title" id="note-title">Location</div>
+            <div class="note-desc" id="note-desc">Description...</div>
+        </div>
+        <button class="close-btn" onclick="closeNotebook()">CLOSE</button>
+    </div>
+    <textarea id="note-input" placeholder="Log loot, hordes, or safehouses..."></textarea>
+    <button class="primary-btn" onclick="saveNote()">UPDATE LOG</button>
+</div>
+
+<div id="logs-modal" class="modal">
+    <div class="modal-header">
+        <div class="note-title">SCAVENGER LOGS</div>
+        <button class="close-btn" onclick="closeLogs()">CLOSE</button>
+    </div>
+    <div class="log-list" id="log-list-container">
+        </div>
+</div>
+
+<div id="settings-modal" class="modal">
+    <div class="modal-header">
+        <div class="note-title" style="color:#fff;">SYSTEM MENU</div>
+        <button class="close-btn" onclick="toggleSettings()">CLOSE</button>
+    </div>
+
+    <div class="settings-section">
+        <div class="settings-label">Progress</div>
+        <div class="action-row">
+            <button class="btn-sm btn-green" id="manual-save-btn" onclick="manualSave()">💾 Save Progress</button>
+            <button class="btn-sm btn-gold" onclick="openLogs()">📜 Review Logs</button>
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <div class="settings-label">World Seed Protocol</div>
+        <div class="seed-row">
+            <input type="number" id="custom-seed-input" placeholder="Enter Seed">
+            <button class="btn-sm" style="flex: 0 0 80px; border-bottom: 2px solid var(--heat);" onclick="applyCustomSeed()">LOAD</button>
+        </div>
+        <div style="font-size: 10px; color: #4b6b55;">Enter custom number to generate terrain.</div>
+    </div>
+
+    <div class="settings-section" style="border:none; padding-bottom: 0;">
+        <div class="settings-label">Actions</div>
+        <div class="action-row">
+            <button class="btn-sm btn-gold" onclick="teleport()">☢️ Wasteland Trek</button>
+            <button class="btn-sm btn-red" onclick="reincarnate()">☠️ New Life</button>
+        </div>
+    </div>
+
+    <div class="credits">Z-Day Engine by Satoru Suzuki</div>
+</div>
+
+<script>
+    // --- 1. CORE ENGINE & SEEDING ---
+    let SEED = Math.floor(Math.random() * 899999) + 100000;
+    
+    // Player State
+    const S = { x: 0, y: 0, ledger: {} };
+
+    // SAVE SYSTEM: LOAD
+    function loadGame() {
+        try {
+            const raw = localStorage.getItem('zday_save');
+            if (raw) {
+                const data = JSON.parse(raw);
+                SEED = data.seed || SEED;
+                S.x = data.x || 0;
+                S.y = data.y || 0;
+                S.ledger = data.ledger || {};
+                console.log("Save loaded.");
+            }
+        } catch (e) { console.error("Save Corrupt", e); }
+    }
+
+    // SAVE SYSTEM: MANUAL SAVE
+    function manualSave() {
+        const data = { seed: SEED, x: S.x, y: S.y, ledger: S.ledger };
+        localStorage.setItem('zday_save', JSON.stringify(data));
+        
+        const btn = document.getElementById('manual-save-btn');
+        const origText = btn.innerHTML;
+        btn.innerHTML = "✅ SAVED!";
+        setTimeout(() => btn.innerHTML = origText, 1500);
+    }
+
+    // Pseudorandom Hash
+    function hash(x, y) {
+        let n = Math.sin(x * 12.9898 + y * 78.233 + SEED) * 43758.5453;
+        return n - Math.floor(n);
+    }
+
+    // Smooth Noise (Bilinear)
+    function noise(x, y) {
+        let i = Math.floor(x);
+        let j = Math.floor(y);
+        let u = x - i;
+        let v = y - j;
+        
+        // Smoothing
+        u = u * u * u * (u * (u * 6 - 15) + 10);
+        v = v * v * v * (v * (v * 6 - 15) + 10);
+        
+        return (1-u)*(1-v)*hash(i, j) + 
+               u*(1-v)*hash(i+1, j) + 
+               (1-u)*v*hash(i, j+1) + 
+               u*v*hash(i+1, j+1);
+    }
+
+    // Fractal Brownian Motion
+    function fbm(x, y, octaves) {
+        let val = 0;
+        let amp = 0.5;
+        let freq = 1;
+        for(let i=0; i<octaves; i++){
+            val += noise(x*freq, y*freq) * amp;
+            amp *= 0.5;
+            freq *= 2;
+        }
+        return val;
+    }
+
+    // --- 2. SURVIVAL WORLD LOGIC (ZOMBIE EDITION) ---
+    
+    // e = elevation (0=water, 1=mountain)
+    // s = moisture/vegetation (0=barren, 1=forest)
+    // c = infection/chaos (0=safe, 1=dead zone)
+    function getSettlement(x, y, e, c) {
+        let h = hash(x, y); // Local randomness
+
+        // CITY LOGIC: Rare, requires solid ground (mid elevation)
+        if (h > 0.99 && e > 0.3 && e < 0.7) {
+            // High infection = Ruined City, Low infection = Functional City
+            if (c > 0.55) {
+                return { type: 'CityRuins', name: 'Ruined Metropolis', icon: '🌆', desc: 'Collapsed skyscrapers. High loot, extreme danger.' };
+            } else {
+                return { type: 'City', name: 'Fortified City', icon: '🏙️', desc: 'Walls, lights, and soldiers. A rare safe haven.' };
+            }
+        }
+
+        // INDUSTRIAL: Uncommon
+        if (h > 0.97 && e > 0.3) {
+            if (c > 0.6) {
+                return { type: 'FactoryDead', name: 'Toxic Factory', icon: '🏭', desc: 'Leaking chemicals and rust. Abandoned.' };
+            } else {
+                return { type: 'FactoryLive', name: 'Ammo Plant', icon: '🏭', desc: 'Smoke stacks active. Survivors making bullets.' };
+            }
+        }
+
+        // VILLAGES: More common
+        if (h > 0.95 && e > 0.25 && e < 0.8) {
+            if (c > 0.5) {
+                return { type: 'VillageRuins', name: 'Burnt Village', icon: '🏚️', desc: 'Shells of houses. Nothing moves here.' };
+            } else {
+                return { type: 'Village', name: 'Farming Village', icon: '🏠', desc: 'Crops and barricades. Friendly locals.' };
+            }
+        }
+
+        // SURVIVOR CAMPS: Common in safe areas
+        if (h > 0.88 && c < 0.4 && e > 0.25) {
+             return { type: 'Camp', name: 'Survivor Camp', icon: '⛺', desc: 'Temporary tents. Traders might be here.' };
+        }
+        
+        return null;
+    }
+
+    function getTileData(x, y) {
+        const scale = 0.08; 
+        
+        let e = fbm(x * scale, y * scale, 4);           // Elevation
+        let s = fbm(x * scale + 500, y * scale + 500, 2); // Vegetation/Overgrowth
+        let c = fbm(x * 0.02 - 100, y * 0.02 - 100, 2);   // Infection/Threat Level
+
+        let data = { 
+            color: 'var(--c-plains)', 
+            name: 'Wasteland', 
+            icon: '', 
+            desc: 'Cracked earth and weeds (1km wide).',
+            rad: 'RAD: 1.2 mSv',
+            cssClass: ''
+        };
+
+        // --- ELEVATION LAYER ---
+        if (e < 0.22) {
+            // WATER
+            data.color = 'var(--c-water)'; data.name = 'Toxic Ocean'; data.desc = 'Black oily water. Undrinkable.'; data.rad = 'RAD: HIGH';
+        } 
+        else if (e > 0.85) {
+            // PEAKS
+            data.color = 'var(--c-peak)'; data.name = 'High Summit'; data.icon = '🗻'; data.desc = 'Air is thin. No zombies up here.'; data.rad = 'RAD: LOW';
+        } 
+        else if (e > 0.75) {
+            // BIG MOUNTAINS
+            data.color = 'var(--c-peak)'; data.name = 'Snowy Peaks'; data.icon = '🏔️'; data.desc = 'Freezing crags.'; data.rad = 'RAD: LOW';
+        }
+        else if (e > 0.65) {
+            // MOUNTAINS
+            data.color = 'var(--c-mtn)'; data.name = 'Rocky Range'; data.icon = '⛰️'; data.desc = 'Difficult terrain. Good visibility.'; data.rad = 'RAD: LOW';
+        }
+        else {
+            // LAND MASS (Plains/Forests/Ruins)
+            
+            // --- INFECTION OVERLAY (The "Cold" Layer) ---
+            if (c > 0.75) {
+                data.color = 'var(--c-void)'; data.name = 'THE DEAD ZONE'; data.icon = '💀'; data.desc = 'Darkness. Endless hordes.'; data.rad = 'RAD: CRITICAL';
+                data.cssClass = 'danger-pulse'; // CSS animation could be added
+            }
+            else if (c > 0.60) {
+                data.color = 'var(--c-dead)'; data.name = 'Biohazard Zone'; data.icon = '☠️'; data.desc = 'Mutated variants spotted.'; data.rad = 'RAD: HIGH';
+            }
+            else {
+                // --- VEGETATION OVERLAY (The "Snow" Layer) ---
+                if (s > 0.65) {
+                     data.color = 'var(--c-forest)'; data.name = 'Deep Forest'; data.icon='🌳'; data.desc = 'Deep cluster of trees.'; data.rad = 'RAD: LOW';
+                }
+                else if (s > 0.50) {
+                    data.color = '#2d4a3e'; data.name = 'Forest'; data.icon='🌳'; data.desc = 'Cluster of trees.'; data.rad = 'RAD: LOW';
+                }
+                else {
+                     // Standard Wasteland
+                     if (hash(x,y) > 0.7) {
+                         data.name = 'Rubble Field'; data.desc = 'Piles of brick and rebar.'; data.color = 'var(--c-ruins)';
+                     }
+                }
+
+                // --- SETTLEMENTS CHECK ---
+                let settlement = getSettlement(x, y, e, c);
+                if (settlement) {
+                    data.icon = settlement.icon; 
+                    data.name = settlement.name; 
+                    data.desc = settlement.desc;
+                    data.color = settlement.type.includes('Ruins') || settlement.type.includes('Dead') ? 'var(--c-ruins)' : '#1e293b';
+                    
+                    if(settlement.type === 'City') data.color = '#0f172a'; // Dark blue for strongholds
+                    if(settlement.type === 'Village') data.color = '#3f2e18'; // Brown for villages
+                }
+            }
+        }
+
+        return data;
+    }
+
+    // --- 3. RENDER ENGINE ---
+    const gridEl = document.getElementById('grid');
+    const coordsEl = document.getElementById('coords-display');
+    const biomeEl = document.getElementById('biome-display');
+    const tempEl = document.getElementById('temp-display');
+    const seedEl = document.getElementById('seed-display');
+
+    function renderMap() {
+        gridEl.innerHTML = '';
+        const range = 5; 
+        
+        for (let y = S.y - range; y <= S.y + range; y++) {
+            for (let x = S.x - range; x <= S.x + range; x++) {
+                const data = getTileData(x, y);
+                const tile = document.createElement('div');
+                
+                tile.className = `tile ${data.cssClass}`;
+                if (x === S.x && y === S.y) tile.classList.add('center-tile');
+                if (S.ledger[`${x},${y}`]) tile.classList.add('has-note');
+
+                tile.style.backgroundColor = data.color;
+                tile.innerText = data.icon;
+                tile.onclick = () => openNotebook(x, y, data);
+                
+                gridEl.appendChild(tile);
+            }
+        }
+
+        const currentTile = getTileData(S.x, S.y);
+        coordsEl.innerText = `${S.x}, ${S.y}`;
+        biomeEl.innerText = currentTile.name;
+        tempEl.innerText = currentTile.rad;
+        
+        // Dynamic Text Color based on Threat
+        if(currentTile.rad.includes('CRITICAL')) tempEl.style.color = 'var(--danger)';
+        else if(currentTile.rad.includes('HIGH')) tempEl.style.color = 'var(--cold)';
+        else tempEl.style.color = 'var(--heat)';
+        
+        seedEl.innerText = `Seed: ${SEED}`;
+    }
+
+    // --- 4. CONTROLS ---
+    const noteModal = document.getElementById('notebook-modal');
+    const settingsModal = document.getElementById('settings-modal');
+    const logsModal = document.getElementById('logs-modal');
+
+    function move(dx, dy) {
+        if(isModalOpen()) return;
+        S.x += dx;
+        S.y += dy;
+        renderMap();
+    }
+
+    function zoom() {
+        if(isModalOpen()) return;
+        openNotebook(S.x, S.y, getTileData(S.x, S.y));
+    }
+
+    function isModalOpen() {
+        return noteModal.classList.contains('active') || 
+               settingsModal.classList.contains('active') ||
+               logsModal.classList.contains('active');
+    }
+
+    function toggleSettings() {
+        if (settingsModal.classList.contains('active')) {
+            settingsModal.classList.remove('active');
+        } else {
+            noteModal.classList.remove('active');
+            logsModal.classList.remove('active');
+            document.getElementById('custom-seed-input').value = SEED;
+            settingsModal.classList.add('active');
+        }
+    }
+
+    // --- LOGS FUNCTIONALITY ---
+    function openLogs() {
+        settingsModal.classList.remove('active'); // Close settings
+        const container = document.getElementById('log-list-container');
+        container.innerHTML = '';
+        
+        const entries = Object.entries(S.ledger);
+        
+        if (entries.length === 0) {
+            container.innerHTML = '<div class="empty-logs">No logs recorded yet.<br>Use the light 🔦 to mark scavenged areas.</div>';
+        } else {
+            entries.forEach(([key, val]) => {
+                const coords = key.split(',');
+                const div = document.createElement('div');
+                div.className = 'log-item';
+                div.innerHTML = `
+                    <span class="log-coords">COORDS: ${coords[0]}, ${coords[1]}</span>
+                    <span class="log-text">${val.replace(/</g, "&lt;")}</span>
+                `;
+                container.appendChild(div);
+            });
+        }
+        logsModal.classList.add('active');
+    }
+
+    function closeLogs() {
+        logsModal.classList.remove('active');
+        settingsModal.classList.add('active'); // Return to settings
+    }
+
+    function applyCustomSeed() {
+        const input = document.getElementById('custom-seed-input').value;
+        if(input) {
+            if(confirm("Loading a new world will reset your coordinates. Continue?")) {
+                SEED = parseInt(input);
+                S.x = 0; S.y = 0; S.ledger = {}; // Reset for new world
+                renderMap();
+                toggleSettings();
+            }
+        }
+    }
+
+    function teleport() {
+        S.x += Math.floor((Math.random() - 0.5) * 5000);
+        S.y += Math.floor((Math.random() - 0.5) * 5000);
+        renderMap();
+        toggleSettings();
+    }
+
+    function reincarnate() {
+        if(confirm("Start a new life? Current loot and logs will be lost.")) {
+            SEED = Math.floor(Math.random() * 899999) + 100000;
+            S.x = 0; S.y = 0; S.ledger = {};
+            renderMap();
+            toggleSettings();
+        }
+    }
+
+    // --- 5. NOTEBOOK SYSTEM ---
+    const nTitle = document.getElementById('note-title');
+    const nDesc = document.getElementById('note-desc');
+    const nInput = document.getElementById('note-input');
+    let currentEdit = {x:0, y:0};
+
+    function openNotebook(x, y, data) {
+        currentEdit = {x, y};
+        nTitle.innerText = `${data.icon || ''} ${data.name}`;
+        nDesc.innerText = `${data.desc} (${data.rad})`;
+        nInput.value = S.ledger[`${x},${y}`] || "";
+        noteModal.classList.add('active');
+    }
+
+    function saveNote() {
+        const val = nInput.value.trim();
+        const key = `${currentEdit.x},${currentEdit.y}`;
+        if (val) S.ledger[key] = val;
+        else delete S.ledger[key];
+        closeNotebook();
+        renderMap(); 
+    }
+
+    function closeNotebook() {
+        noteModal.classList.remove('active');
+        nInput.blur();
+    }
+
+    // --- INIT ---
+    loadGame(); // Load only on startup
+    renderMap();
+
+    document.addEventListener('keydown', (e) => {
+        if (isModalOpen()) return;
+        const k = e.key.toLowerCase();
+        if (k === 'arrowup' || k === 'w') move(0, -1);
+        if (k === 'arrowdown' || k === 's') move(0, 1);
+        if (k === 'arrowleft' || k === 'a') move(-1, 0);
+        if (k === 'arrowright' || k === 'd') move(1, 0);
+        if (k === 'enter' || k === ' ') zoom();
+    });
+
+</script>
+</body>
+</html>
