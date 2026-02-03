@@ -26,6 +26,8 @@ Z-Day uses Triple-Layer Noise Abstraction to determine the environment based on 
 * 📜 The Scavenger's Log: A built-in coordinate-based ledger that allows survivors to "tag" locations with notes on loot caches, horde movements, or water sources.
 * 💾 Persistent Save System: Integrated localStorage support. Your location (X, Y), world seed, and all scavenger logs are automatically saved and reloaded.
 * 📋 Centralized Log Reviewer: View every discovery you have ever made in the infinite world in one chronological list, making navigation back to safe zones easy.
+* **🔑 Custom Seed Injection:** Players can now manually input and "Load" specific world seeds, allowing for shared world exploration and speed-running.
+* **⚙️ Unified System Menu:** A clean modal-based UI replaces the old action bar, housing world-reset, trekking, and log-management tools.
 * 💯 Zero-Dependency Architecture: A "Digital Talisman"—one single HTML file containing all Logic (JS), Styling (CSS), and Structure (HTML).
 
 ---
