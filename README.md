@@ -20,7 +20,7 @@ Z-Era uses **Triple-Layer Noise Abstraction** to determine the environment based
 
 ## ✨ Key Features 
 
-* **🗺️ Infinite Urban Exploration:** Uses **Fractal Brownian Motion (FBM)** with 4 octaves to ensure natural, continuous terrain across infinite coordinates.
+* **🌐 Infinite Precedual Exploration:** Uses **Fractal Brownian Motion (FBM)** with 4 octaves to ensure natural, continuous terrain across infinite coordinates.
 * **🏚️ Infection Sync Settlements:** Intelligent spawning that distinguishes between **Functional (Safe)** and **Ruined (Hazardous)** locations based on local infection data.
 * **🏗️ Dynamic Industrial Zones:** Spawns functional **Ammo Plants** or abandoned **Toxic Factories** depending on the surrounding biological chaos.
 * **📜 The Scavenger's Log:** A built-in coordinate-based ledger that allows survivors to "tag" locations with notes on loot caches, horde movements, or water sources.
